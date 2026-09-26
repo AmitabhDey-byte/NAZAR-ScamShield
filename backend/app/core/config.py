@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     n8n_webhook_secret: str | None = None
     public_api_url: str | None = None
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    allowed_origin_regex: str | None = r"^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$"
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
 
     @property

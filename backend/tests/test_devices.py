@@ -74,3 +74,18 @@ def test_phone_pairing_and_event_sync():
             assert blocked.status_code == 422
     finally:
         app.dependency_overrides.clear()
+
+
+def test_vercel_preflight_is_allowed_but_unrelated_origins_are_rejected():
+    with TestClient(app) as client:
+        headers = {
+            "Origin": "https://nazar-git-main-amita.vercel.app",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "content-type",
+        }
+        allowed = client.options("/api/dashboard", headers=headers)
+        assert allowed.status_code == 200
+        assert allowed.headers["access-control-allow-origin"] == headers["Origin"]
+
+        rejected = client.options("/api/dashboard", headers={**headers, "Origin": "https://untrusted.example"})
+        assert rejected.status_code == 400

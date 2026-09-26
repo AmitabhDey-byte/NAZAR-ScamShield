@@ -109,6 +109,7 @@ PUBLIC_API_URL=https://nazar-scamshield.onrender.com
 VITE_API_BASE_URL=http://localhost:8000
 EXPO_PUBLIC_API_BASE_URL=https://nazar-scamshield.onrender.com
 ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+ALLOWED_ORIGIN_REGEX=^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$
 ```
 
 Never prefix the Gemini key with `VITE_`; that would expose it to browser code.
@@ -128,6 +129,10 @@ origin to Render's `ALLOWED_ORIGINS` and redeploy the backend, for example:
 ```dotenv
 ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://your-nazar-site.vercel.app
 ```
+
+The default `ALLOWED_ORIGIN_REGEX` also accepts HTTPS Vercel deployment and
+preview subdomains. Keep the exact production origin in `ALLOWED_ORIGINS` when
+you know it; do not include a path or trailing slash.
 
 For Expo Go, `mobile/.env.example` points to the Render API. Copy it to
 `mobile/.env.local` only when you want to override the production default,
