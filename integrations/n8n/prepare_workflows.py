@@ -59,6 +59,9 @@ def repair_twilio(workflow):
     nodes["Send Message to Honeypot Session"]["parameters"]["url"] = (
         "={{ '" + API + "/api/honeypot/' + $json.session_id + '/message' }}"
     )
+    nodes["Start Honeypot Session"]["parameters"]["jsonBody"] = (
+        '={{ JSON.stringify({ analysis_id: $("Send to NAZAR").item.json.analysis.id, enable_canary: true }) }}'
+    )
     for name in ("Lookup Honeypot Session", "Save Sender-Session Mapping"):
         nodes[name]["parameters"]["dataTableId"]["value"] = "RESELECT_TABLE_IN_N8N"
     nodes["Lookup Honeypot Session"]["alwaysOutputData"] = True

@@ -66,6 +66,7 @@ async def integration_status(db: AsyncSession = Depends(get_session)):
     return {
         "n8n_secret": "configured" if settings.n8n_webhook_secret else "not-configured",
         "gemini": "configured" if settings.gemini_api_key else "not-configured",
+        "canarytoken": "configured" if settings.validated_canarytoken_url else "not-configured",
         "channels": channels,
         "checked_at": datetime.now(timezone.utc),
     }

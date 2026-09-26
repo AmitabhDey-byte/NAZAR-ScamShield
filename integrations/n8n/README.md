@@ -22,6 +22,11 @@ Keep `GEMINI_API_KEY` configured if you want Gemini analysis and honeypot
 replies. Deploy the latest backend code before testing. Check `/api/health` and
 confirm `integrations.n8n_gmail` and `integrations.n8n_twilio` say `configured`.
 
+To arm the visible honeypot tripwire, create a fresh **Web Bug** token and set
+`CANARYTOKEN_URL` in Render. Never paste the token into GitHub, n8n, Vercel, or
+frontend environment variables: anyone who requests it can create a false
+alert. NAZAR validates the hostname but never opens the URL itself.
+
 ## 2. n8n credentials
 
 Create one **Header Auth** credential for NAZAR. Set **Name** to
@@ -40,6 +45,17 @@ Attach your **Gmail OAuth2** credential to `Gmail Trigger - New Unread`,
 credential (Account SID and Auth Token) to `Send Approved Honeypot Reply`.
 Set the actual approver address in that Gmail approval node, replacing
 `REPLACE_WITH_APPROVER_EMAIL`.
+
+The included Twilio workflow sends `enable_canary: true` when it creates a new
+honeypot session. If you already published an older workflow, open **Start
+Honeypot Session** and set its JSON body to:
+
+```javascript
+{{ JSON.stringify({ analysis_id: $("Send to NAZAR").item.json.analysis.id, enable_canary: true }) }}
+```
+
+Keep the Gmail human-approval node enabled. The Canary link appears in the
+proposed reply but is not sent until you approve it.
 
 ## 3. Twilio session table
 

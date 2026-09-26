@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,7 @@ class Settings(BaseSettings):
     google_safe_browsing_api_key: str | None = None
     urlhaus_auth_key: str | None = None
     n8n_webhook_secret: str | None = None
+    canarytoken_url: str | None = None
     public_api_url: str | None = None
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     allowed_origin_regex: str | None = r"^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$"
@@ -35,6 +37,20 @@ class Settings(BaseSettings):
     @property
     def database_label(self) -> str:
         return "lakebase-postgres" if "postgres" in self.database_url else "local-sqlite"
+
+    @property
+    def validated_canarytoken_url(self) -> str | None:
+        raw = (self.canarytoken_url or "").strip()
+        if not raw:
+            return None
+        parsed = urlparse(raw)
+        hostname = (parsed.hostname or "").lower()
+        allowed_host = hostname in {"canarytokens.com", "canarytokens.org"} or hostname.endswith(
+            (".canarytokens.com", ".canarytokens.org")
+        )
+        if parsed.scheme not in {"http", "https"} or not allowed_host:
+            return None
+        return raw
 
 
 @lru_cache

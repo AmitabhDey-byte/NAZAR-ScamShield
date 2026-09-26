@@ -14,7 +14,25 @@ from app.core.config import settings
 router = APIRouter(prefix="/api/honeypot", tags=["honeypot"])
 
 
+def configured_canary_url() -> str | None:
+    """Return a configured Canarytokens URL without ever requesting it."""
+    return settings.validated_canarytoken_url
+
+
+def add_canary_lure(reply: str, intelligence: dict) -> tuple[str, dict, bool]:
+    """Append the visible tripwire once when this session was explicitly armed."""
+    canary = dict(intelligence.get("canary") or {})
+    url = configured_canary_url()
+    if not canary.get("armed") or canary.get("proposed") or not url:
+        return reply, intelligence, False
+    canary["proposed"] = True
+    intelligence["canary"] = canary
+    lure = "I cannot open the receipt page on my phone. Can you open this link on your side and tell me what it shows?"
+    return f"{reply}\n\n{lure} {url}", intelligence, True
+
+
 def serialize(session: HoneypotSession, messages: list[HoneypotMessage], engine: str | None = None) -> dict:
+    canary = dict((session.intelligence or {}).get("canary") or {})
     return {
         "id": session.id,
         "analysis_id": session.analysis_id,
@@ -23,6 +41,11 @@ def serialize(session: HoneypotSession, messages: list[HoneypotMessage], engine:
         "intelligence": session.intelligence,
         "reply_engine": engine,
         "gemini_available": bool(settings.gemini_api_key),
+        "canary": {
+            "configured": configured_canary_url() is not None,
+            "armed": bool(canary.get("armed")),
+            "proposed": bool(canary.get("proposed")),
+        },
         "messages": [
             {"id": msg.id, "role": msg.role, "content": msg.content, "created_at": msg.created_at}
             for msg in messages
@@ -32,7 +55,17 @@ def serialize(session: HoneypotSession, messages: list[HoneypotMessage], engine:
 
 @router.post("/start")
 async def start(payload: HoneypotStartRequest, db: AsyncSession = Depends(get_session)):
-    session = HoneypotSession(analysis_id=payload.analysis_id, intelligence={})
+    canary_configured = configured_canary_url() is not None
+    session = HoneypotSession(
+        analysis_id=payload.analysis_id,
+        intelligence={
+            "canary": {
+                "requested": payload.enable_canary,
+                "armed": payload.enable_canary and canary_configured,
+                "proposed": False,
+            }
+        },
+    )
     db.add(session)
     await db.flush()
     opening = HoneypotMessage(
@@ -43,7 +76,14 @@ async def start(payload: HoneypotStartRequest, db: AsyncSession = Depends(get_se
     db.add(opening)
     await db.commit()
     await db.refresh(opening)
-    await broker.publish("honeypot.started", {"session_id": session.id, "analysis_id": session.analysis_id})
+    await broker.publish(
+        "honeypot.started",
+        {
+            "session_id": session.id,
+            "analysis_id": session.analysis_id,
+            "canary_armed": payload.enable_canary and canary_configured,
+        },
+    )
     return serialize(session, [opening], "safe-opening")
 
 
@@ -70,6 +110,9 @@ async def send_message(session_id: str, payload: HoneypotMessageRequest, db: Asy
     else:
         next_state, reply = next_response(session.state, payload.content, intelligence)
         engine = "rules"
+    reply, intelligence, canary_added = add_canary_lure(reply, intelligence)
+    if canary_added:
+        engine = f"{engine}+canary"
     assistant = HoneypotMessage(session_id=session.id, role="assistant", content=reply)
     session.state = next_state
     session.intelligence = intelligence
@@ -77,7 +120,15 @@ async def send_message(session_id: str, payload: HoneypotMessageRequest, db: Asy
     db.add_all([scammer, assistant])
     await db.commit()
     messages = (await db.scalars(select(HoneypotMessage).where(HoneypotMessage.session_id == session.id).order_by(HoneypotMessage.created_at))).all()
-    await broker.publish("honeypot.turn", {"session_id": session.id, "state": session.state, "engine": engine})
+    await broker.publish(
+        "honeypot.turn",
+        {
+            "session_id": session.id,
+            "state": session.state,
+            "engine": engine,
+            "canary_proposed": canary_added,
+        },
+    )
     return serialize(session, list(messages), engine)
 
 

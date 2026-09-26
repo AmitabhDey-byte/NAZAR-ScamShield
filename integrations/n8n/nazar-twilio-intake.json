@@ -490,7 +490,7 @@
         "url": "https://nazar-scamshield.onrender.com/api/honeypot/start",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ analysis_id: $(\"Send to NAZAR\").item.json.analysis.id }) }}",
+        "jsonBody": "={{ JSON.stringify({ analysis_id: $(\"Send to NAZAR\").item.json.analysis.id, enable_canary: true }) }}",
         "options": {},
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth"
@@ -504,7 +504,7 @@
         576
       ],
       "onError": "continueErrorOutput",
-      "notes": "Starts a new NAZAR honeypot session for this sender using the analysis id from the Send to NAZAR response."
+      "notes": "Starts a new NAZAR honeypot session and explicitly arms the server-side Canarytokens tripwire. The actual token URL is stored only in Render."
     },
     {
       "parameters": {

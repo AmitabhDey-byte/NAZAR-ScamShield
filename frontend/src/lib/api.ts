@@ -27,7 +27,7 @@ export const api = {
   devices: () => request<PairedDevice[]>('/api/devices'),
   createPairCode: () => request<PairCode>('/api/devices/pair-code', { method: 'POST' }),
   call: (payload: { transcript: string; caller_number?: string }) => request<Analysis>('/api/calls/analyze', { method: 'POST', body: JSON.stringify(payload) }),
-  startHoneypot: (analysis_id?: string) => request<any>('/api/honeypot/start', { method: 'POST', body: JSON.stringify({ analysis_id }) }),
+  startHoneypot: (analysis_id?: string, enable_canary = false) => request<any>('/api/honeypot/start', { method: 'POST', body: JSON.stringify({ analysis_id, enable_canary }) }),
   honeypot: (id: string) => request<any>(`/api/honeypot/${id}`),
   sendHoneypot: (id: string, content: string) => request<any>(`/api/honeypot/${id}/message`, { method: 'POST', body: JSON.stringify({ content }) }),
 }

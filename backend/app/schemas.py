@@ -58,6 +58,7 @@ class ReportCreate(BaseModel):
 
 class HoneypotStartRequest(BaseModel):
     analysis_id: str | None = None
+    enable_canary: bool = False
 
 
 class HoneypotMessageRequest(BaseModel):

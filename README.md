@@ -113,6 +113,7 @@ URL_INTELLIGENCE_TIMEOUT_SECONDS=4
 GOOGLE_SAFE_BROWSING_API_KEY=
 URLHAUS_AUTH_KEY=
 N8N_WEBHOOK_SECRET=replace-with-a-long-random-secret
+CANARYTOKEN_URL=
 PUBLIC_API_URL=https://nazar-scamshield.onrender.com
 VITE_API_BASE_URL=http://localhost:8000
 EXPO_PUBLIC_API_BASE_URL=https://nazar-scamshield.onrender.com
@@ -121,6 +122,10 @@ ALLOWED_ORIGIN_REGEX=^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$
 ```
 
 Never prefix the Gemini key with `VITE_`; that would expose it to browser code.
+Keep `CANARYTOKEN_URL` server-side in Render as well. The honeypot adds it only
+to an explicitly armed, human-approved reply and never requests the URL itself.
+Use a fresh token for each controlled demo so unrelated requests cannot create
+misleading alerts.
 
 URL analysis uses IANA's RDAP bootstrap data and the authoritative registry's
 RDAP service for domain age. For external blacklist checks, configure a Google
