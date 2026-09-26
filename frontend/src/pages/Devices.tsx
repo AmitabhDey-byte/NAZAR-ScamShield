@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Clock3, Copy, Link2, RefreshCw, ShieldCheck, Smartphone, Wifi } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { ErrorBlock, LoadingBlock } from '../components/StateBlock'
-import { api } from '../lib/api'
+import { API_BASE, api } from '../lib/api'
 import type { PairCode, PairedDevice } from '../lib/types'
 
 function lastSeen(value: string) {
@@ -29,7 +29,7 @@ export default function Devices() {
   }, [])
 
   useEffect(() => { load(); const timer = window.setInterval(load, 15_000); return () => window.clearInterval(timer) }, [load])
-  const apiAddress = useMemo(() => pairCode?.api_url || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Generate a code to detect your Wi-Fi address' : `http://${window.location.hostname}:8000`), [pairCode])
+  const apiAddress = useMemo(() => pairCode?.api_url || API_BASE, [pairCode])
   const createCode = async () => {
     setGenerating(true); setCopied(false)
     try { setPairCode(await api.createPairCode()); setError('') }

@@ -6,10 +6,11 @@ import secrets
 import socket
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.database import get_session
 from app.models import AnalysisRequest, Device, MobileEvent
 from app.schemas import DeviceRegisterRequest, MobileEventCreate
@@ -32,6 +33,26 @@ def local_api_url() -> str:
     finally:
         probe.close()
     return f"http://{address}:8000"
+
+
+def public_api_url(request: Request) -> str:
+    """Return an address the phone can actually reach.
+
+    Hosted platforms expose an internal machine address to Python, so local
+    socket discovery is only suitable for local development. Prefer an
+    explicit public URL and otherwise honor the proxy host Render forwards.
+    """
+    if settings.public_api_url:
+        return settings.public_api_url.rstrip("/")
+
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+    host = forwarded_host or request.headers.get("host", "").strip()
+    if host and not host.startswith(("localhost", "127.0.0.1", "0.0.0.0")):
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+        scheme = forwarded_proto or request.url.scheme or "https"
+        return f"{scheme}://{host}".rstrip("/")
+
+    return local_api_url()
 
 
 def token_hash(token: str) -> str:
@@ -58,11 +79,11 @@ async def authenticate(device_id: str, token: str | None, db: AsyncSession) -> D
 
 
 @router.post("/pair-code")
-async def create_pair_code():
+async def create_pair_code(request: Request):
     code = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     _pair_codes[code] = expires_at
-    return {"code": code, "expires_at": expires_at, "api_url": local_api_url()}
+    return {"code": code, "expires_at": expires_at, "api_url": public_api_url(request)}
 
 
 @router.post("/register")

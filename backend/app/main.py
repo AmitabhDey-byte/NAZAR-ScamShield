@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.core.config import settings
-from app.database import init_db
+from app.database import SessionLocal, init_db
 from app.routers import analysis, calls, devices, honeypot, intelligence, integrations, model, realtime, reports
 
 
@@ -32,10 +33,17 @@ for api_router in [analysis.router, reports.router, honeypot.router, intelligenc
 
 @app.get("/api/health")
 async def health():
+    database_status = "connected"
+    try:
+        async with SessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception:
+        database_status = "unavailable"
     return {
-        "status": "ok",
+        "status": "ok" if database_status == "connected" else "degraded",
         "database": settings.database_label,
-        "gemini": "connected" if settings.gemini_api_key else "not-configured",
+        "database_status": database_status,
+        "gemini": "configured" if settings.gemini_api_key else "not-configured",
         "gemini_model": settings.gemini_model if settings.gemini_api_key else None,
         "realtime": "sse",
         "integrations": {

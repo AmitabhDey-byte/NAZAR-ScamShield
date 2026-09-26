@@ -104,11 +104,34 @@ DATABASE_URL_UNPOOLED=postgresql://user:password@your-endpoint.region.aws.neon.t
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash-lite
 GEMINI_TIMEOUT_SECONDS=12
+N8N_WEBHOOK_SECRET=replace-with-a-long-random-secret
+PUBLIC_API_URL=https://nazar-scamshield.onrender.com
 VITE_API_BASE_URL=http://localhost:8000
+EXPO_PUBLIC_API_BASE_URL=https://nazar-scamshield.onrender.com
 ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 Never prefix the Gemini key with `VITE_`; that would expose it to browser code.
+
+## Production deployment
+
+The backend is configured for `https://nazar-scamshield.onrender.com`. On the
+Render service, set `PUBLIC_API_URL` to that exact URL so phone pairing never
+receives Render's private container address.
+
+For Vercel, import the repository, set **Root Directory** to `frontend`, and
+set `VITE_API_BASE_URL=https://nazar-scamshield.onrender.com`. The committed
+`frontend/vercel.json` keeps React Router pages working when opened or
+refreshed directly. After Vercel gives you the final site URL, add that exact
+origin to Render's `ALLOWED_ORIGINS` and redeploy the backend, for example:
+
+```dotenv
+ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://your-nazar-site.vercel.app
+```
+
+For Expo Go, `mobile/.env.example` points to the Render API. Copy it to
+`mobile/.env.local` only when you want to override the production default,
+then fully reload the app in Expo Go.
 
 ## Neon setup
 
@@ -121,7 +144,7 @@ Never prefix the Gemini key with `VITE_`; that would expose it to browser code.
 alembic upgrade head
 ```
 
-The API also calls `create_all()` at startup for hackatho convenience. Keep Alembic as the source of schema change history for team/production workflows.
+The API also calls `create_all()` at startup for hackathon convenience. Keep Alembic as the source of schema change history for team/production workflows.
 
 ## Demo flow
 
@@ -181,6 +204,7 @@ pytest -q
 | GET | `/api/devices/{id}/feed` | Read that phone's scans plus Gmail/Twilio live signals |
 | GET | `/api/realtime/events` | Server-sent live analysis, report, device, and honeypot events |
 | POST | `/api/integrations/n8n/gmail` | Ingest a Gmail Trigger event from n8n and analyze it live |
+| POST | `/api/integrations/n8n/twilio` | Ingest an SMS or WhatsApp event from n8n and analyze it live |
 
 ## Privacy and security
 

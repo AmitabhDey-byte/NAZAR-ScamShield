@@ -5,16 +5,38 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.database import get_session
+from app.models import AnalysisRequest
 from app.schemas import GmailWebhookRequest, TwilioWebhookRequest
 from app.routers.analysis import persist
 from app.services.pipeline import analyze_pipeline
 
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
+
+
+def _source_marker(label: str, external_id: str | None) -> str:
+    return f"\n\n[NAZAR {label}: {external_id}]" if external_id else ""
+
+
+async def _existing_delivery(
+    db: AsyncSession,
+    source_type: str,
+    marker: str,
+) -> AnalysisRequest | None:
+    if not marker:
+        return None
+    return await db.scalar(
+        select(AnalysisRequest)
+        .where(AnalysisRequest.source_type == source_type)
+        .where(AnalysisRequest.input_text.endswith(marker))
+        .order_by(AnalysisRequest.created_at.desc())
+        .limit(1)
+    )
 
 
 def _header_value(headers: list[dict], name: str) -> str:
@@ -80,8 +102,15 @@ async def ingest_gmail(
     evidence = "\n".join(filter(None, [f"From: {email.sender}" if email.sender else "", f"Subject: {email.subject}" if email.subject else "", body, email.snippet]))
     if len(evidence.strip()) < 3:
         raise HTTPException(422, "Gmail event has no readable subject or body")
+    marker = _source_marker("Gmail message ID", email.message_id)
+    existing = await _existing_delivery(db, "gmail", marker)
+    if existing:
+        return {
+            "status": "duplicate", "source": "gmail", "message_id": email.message_id,
+            "thread_id": email.thread_id, "analysis": existing,
+        }
     result = await analyze_pipeline(evidence[:40000])
-    persisted = await persist(result, "gmail", evidence[:40000], db)
+    persisted = await persist(result, "gmail", evidence[:40000] + marker, db)
     return {"status": "accepted", "source": "gmail", "message_id": email.message_id, "thread_id": email.thread_id, "analysis": persisted}
 
 
@@ -107,8 +136,16 @@ async def ingest_twilio(
         f"Profile: {event.profile_name}" if event.profile_name else "",
         event.body,
     ]))
+    marker = _source_marker("Twilio message SID", event.message_sid)
+    existing = await _existing_delivery(db, source, marker)
+    if existing:
+        return {
+            "status": "duplicate", "source": source, "message_sid": event.message_sid,
+            "sender": event.sender, "recipient": event.recipient, "analysis": existing,
+            "reply_mode": "analyst-approved-n8n-send",
+        }
     result = await analyze_pipeline(evidence[:20000])
-    persisted = await persist(result, source, evidence[:20000], db)
+    persisted = await persist(result, source, evidence[:20000] + marker, db)
     return {
         "status": "accepted", "source": source, "message_sid": event.message_sid,
         "sender": event.sender, "recipient": event.recipient, "analysis": persisted,

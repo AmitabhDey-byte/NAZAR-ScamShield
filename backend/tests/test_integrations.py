@@ -1,4 +1,4 @@
-from app.routers.integrations import _extract_twilio_payload
+from app.routers.integrations import _extract_twilio_payload, _source_marker
 
 
 def test_twilio_accepts_original_form_fields_from_n8n():
@@ -26,3 +26,8 @@ def test_twilio_accepts_existing_flat_n8n_mapping():
     assert event.sender == "+919000012345"
     assert event.body == "Payment due"
     assert event.channel == "sms"
+
+
+def test_external_delivery_marker_is_stable_and_optional():
+    assert _source_marker("Twilio message SID", "SM456") == "\n\n[NAZAR Twilio message SID: SM456]"
+    assert _source_marker("Gmail message ID", None) == ""

@@ -42,7 +42,7 @@ import {
   X,
 } from 'lucide-react-native'
 
-import { analyzeFromPhone, fetchDeviceFeed, heartbeat, pairDevice } from './src/api'
+import { analyzeFromPhone, DEFAULT_API_BASE, fetchDeviceFeed, heartbeat, pairDevice } from './src/api'
 import { colors } from './src/theme'
 import type { Analysis, MobileEvent, Pairing, ScreenName } from './src/types'
 
@@ -78,7 +78,7 @@ function BottomNav({ screen, setScreen }: { screen: ScreenName; setScreen: (scre
 }
 
 function PairModal({ visible, onClose, onPaired }: { visible: boolean; onClose: () => void; onPaired: (pairing: Pairing) => void }) {
-  const [apiBase, setApiBase] = useState('http://192.168.1.10:8000')
+  const [apiBase, setApiBase] = useState(DEFAULT_API_BASE)
   const [code, setCode] = useState('')
   const [name, setName] = useState(Platform.OS === 'ios' ? 'My iPhone' : 'My Android')
   const [busy, setBusy] = useState(false)
@@ -92,7 +92,7 @@ function PairModal({ visible, onClose, onPaired }: { visible: boolean; onClose: 
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not pair this phone') }
     finally { setBusy(false) }
   }
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalShade}><View style={styles.pairSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.kicker}>SECURE DEVICE LINK</Text><Text style={styles.sheetTitle}>Pair with NAZAR Desktop</Text></View><Pressable onPress={onClose} style={styles.iconButton}><X size={19} color={colors.muted} /></Pressable></View><Text style={styles.sheetBody}>On the computer, open Devices and generate a six-digit pairing code. Both devices must reach the same NAZAR API.</Text><Text style={styles.inputLabel}>DESKTOP API ADDRESS</Text><TextInput value={apiBase} onChangeText={setApiBase} autoCapitalize="none" keyboardType="url" placeholder="http://192.168.1.10:8000" placeholderTextColor={colors.quiet} style={styles.input} /><Text style={styles.inputLabel}>PAIRING CODE</Text><TextInput value={code} onChangeText={value => setCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" placeholder="000000" placeholderTextColor={colors.quiet} style={[styles.input, styles.codeInput]} /><Text style={styles.inputLabel}>DEVICE NAME</Text><TextInput value={name} onChangeText={setName} placeholder="My phone" placeholderTextColor={colors.quiet} style={styles.input} />{error ? <Text style={styles.errorText}>{error}</Text> : null}<Pressable disabled={busy || code.length !== 6 || !name.trim()} onPress={connect} style={({ pressed }) => [styles.primaryButton, (pressed || busy || code.length !== 6) && { opacity: .55 }]}>{busy ? <ActivityIndicator color={colors.canvas} /> : <><Link2 size={18} color={colors.canvas} /><Text style={styles.primaryButtonText}>Pair this phone</Text><ArrowRight size={17} color={colors.canvas} /></>}</Pressable><View style={styles.privacyLine}><LockKeyhole size={14} color={colors.safe} /><Text style={styles.privacyText}>The device token stays only on this phone.</Text></View></View></KeyboardAvoidingView></Modal>
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalShade}><View style={styles.pairSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.kicker}>SECURE DEVICE LINK</Text><Text style={styles.sheetTitle}>Pair with NAZAR Desktop</Text></View><Pressable onPress={onClose} style={styles.iconButton}><X size={19} color={colors.muted} /></Pressable></View><Text style={styles.sheetBody}>On the computer, open Devices and generate a six-digit pairing code. Both devices must reach the same NAZAR API.</Text><Text style={styles.inputLabel}>NAZAR API ADDRESS</Text><TextInput value={apiBase} onChangeText={setApiBase} autoCapitalize="none" keyboardType="url" placeholder="https://nazar-scamshield.onrender.com" placeholderTextColor={colors.quiet} style={styles.input} /><Text style={styles.inputLabel}>PAIRING CODE</Text><TextInput value={code} onChangeText={value => setCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" placeholder="000000" placeholderTextColor={colors.quiet} style={[styles.input, styles.codeInput]} /><Text style={styles.inputLabel}>DEVICE NAME</Text><TextInput value={name} onChangeText={setName} placeholder="My phone" placeholderTextColor={colors.quiet} style={styles.input} />{error ? <Text style={styles.errorText}>{error}</Text> : null}<Pressable disabled={busy || code.length !== 6 || !name.trim()} onPress={connect} style={({ pressed }) => [styles.primaryButton, (pressed || busy || code.length !== 6) && { opacity: .55 }]}>{busy ? <ActivityIndicator color={colors.canvas} /> : <><Link2 size={18} color={colors.canvas} /><Text style={styles.primaryButtonText}>Pair this phone</Text><ArrowRight size={17} color={colors.canvas} /></>}</Pressable><View style={styles.privacyLine}><LockKeyhole size={14} color={colors.safe} /><Text style={styles.privacyText}>The device token stays only on this phone.</Text></View></View></KeyboardAvoidingView></Modal>
 }
 
 function ResultModal({ result, onClose }: { result: Analysis | null; onClose: () => void }) {

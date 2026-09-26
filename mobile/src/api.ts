@@ -1,6 +1,10 @@
 import type { Analysis, MobileEvent, Pairing } from './types'
 import { Platform } from 'react-native'
 
+export const DEFAULT_API_BASE = (
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'https://nazar-scamshield.onrender.com'
+).replace(/\/$/, '')
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...options,

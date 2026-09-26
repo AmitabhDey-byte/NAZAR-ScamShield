@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: float = 12.0
     n8n_webhook_secret: str | None = None
+    public_api_url: str | None = None
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
 

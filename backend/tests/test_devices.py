@@ -31,7 +31,12 @@ def test_phone_pairing_and_event_sync():
     app.dependency_overrides[get_session] = override_session
     try:
         with TestClient(app) as client:
-            pair_code = client.post("/api/devices/pair-code").json()["code"]
+            pair_response = client.post(
+                "/api/devices/pair-code",
+                headers={"X-Forwarded-Host": "nazar.example", "X-Forwarded-Proto": "https"},
+            ).json()
+            assert pair_response["api_url"] == "https://nazar.example"
+            pair_code = pair_response["code"]
             paired = client.post(
                 "/api/devices/register",
                 json={"pair_code": pair_code, "device_name": "Test phone", "platform": "android", "app_version": "1.0.0"},
