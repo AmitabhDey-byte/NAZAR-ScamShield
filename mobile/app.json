@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "NAZAR Mobile",
+    "slug": "nazar-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "nazar",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.nazar.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NAZAR uses the camera only when you choose to scan a suspicious QR code."
+      }
+    },
+    "android": {
+      "package": "in.nazar.mobile",
+      "permissions": ["CAMERA"],
+      "adaptiveIcon": {
+        "backgroundColor": "#080A09",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-camera", { "cameraPermission": "Allow NAZAR to scan suspicious QR codes.", "recordAudioAndroid": false }]
+    ]
+  }
+}

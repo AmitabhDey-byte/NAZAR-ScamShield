@@ -1,0 +1,16 @@
+export const colors = {
+  canvas: '#06111F',
+  elevated: '#081827',
+  panel: '#0B1728',
+  panelStrong: '#11233A',
+  line: 'rgba(148,163,184,0.16)',
+  text: '#F8FAFC',
+  muted: '#93A4BA',
+  quiet: '#64748B',
+  bronze: '#22D3EE',
+  gold: '#3B82F6',
+  safe: '#25C281',
+  warning: '#F5A524',
+  danger: '#FF5D73',
+  info: '#22D3EE',
+}
