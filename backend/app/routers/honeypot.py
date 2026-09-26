@@ -49,6 +49,13 @@ def serialize(
     telemetry: list[HoneypotTelemetryHit] | None = None,
 ) -> dict:
     canary = dict((session.intelligence or {}).get("canary") or {})
+    delivery_policy = dict((session.intelligence or {}).get("delivery_policy") or {})
+    generated_replies = max(0, sum(message.role == "assistant" for message in messages) - 1)
+    auto_reply_allowed = bool(
+        delivery_policy.get("auto_reply_eligible")
+        and generated_replies > 0
+        and generated_replies <= settings.honeypot_max_auto_replies
+    )
     return {
         "id": session.id,
         "analysis_id": session.analysis_id,
@@ -57,6 +64,14 @@ def serialize(
         "intelligence": session.intelligence,
         "reply_engine": engine,
         "gemini_available": bool(settings.gemini_api_key),
+        "auto_reply": {
+            "enabled": settings.honeypot_auto_reply_enabled,
+            "allowed": auto_reply_allowed,
+            "risk_threshold": settings.honeypot_auto_reply_threshold,
+            "generated_replies": generated_replies,
+            "max_replies": settings.honeypot_max_auto_replies,
+            "fallback": "gmail-human-approval",
+        },
         "canary": {
             "configured": telemetry_beacon_configured(),
             "armed": bool(canary.get("armed")),
@@ -114,6 +129,16 @@ async def start(payload: HoneypotStartRequest, db: AsyncSession = Depends(get_se
                 "threshold": settings.telemetry_risk_threshold,
                 "eligible": risk_eligible,
             },
+            "delivery_policy": {
+                "auto_reply_eligible": bool(
+                    settings.honeypot_auto_reply_enabled
+                    and risk_score is not None
+                    and risk_score >= settings.honeypot_auto_reply_threshold
+                ),
+                "risk_score": risk_score,
+                "threshold": settings.honeypot_auto_reply_threshold,
+                "max_replies": settings.honeypot_max_auto_replies,
+            },
         },
     )
     session.intelligence["canary"]["armed"] = payload.enable_canary and canary_configured and risk_eligible
@@ -133,6 +158,7 @@ async def start(payload: HoneypotStartRequest, db: AsyncSession = Depends(get_se
             "session_id": session.id,
             "analysis_id": session.analysis_id,
             "canary_armed": payload.enable_canary and canary_configured and risk_eligible,
+            "auto_reply_eligible": session.intelligence["delivery_policy"]["auto_reply_eligible"],
         },
     )
     return serialize(session, [opening], "safe-opening")

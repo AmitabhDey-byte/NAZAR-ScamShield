@@ -69,6 +69,7 @@ async def integration_status(db: AsyncSession = Depends(get_session)):
         "canarytoken": "configured" if settings.validated_canarytoken_url else "not-configured",
         "honeypot_telemetry": "configured" if settings.validated_canarytoken_url and settings.public_api_url else "not-configured",
         "ipinfo": "configured" if settings.ipinfo_token else "not-configured",
+        "honeypot_auto_reply": "enabled" if settings.honeypot_auto_reply_enabled else "human-approval",
         "channels": channels,
         "checked_at": datetime.now(timezone.utc),
     }

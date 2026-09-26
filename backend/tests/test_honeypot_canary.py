@@ -85,6 +85,8 @@ def test_beacon_captures_request_telemetry_and_redirects(monkeypatch):
     analysis_id = asyncio.run(prepare_database())
     monkeypatch.setattr(settings, "canarytoken_url", "https://canarytokens.com/example/token")
     monkeypatch.setattr(settings, "public_api_url", "https://api.nazar.test")
+    monkeypatch.setattr(settings, "honeypot_auto_reply_enabled", True)
+    monkeypatch.setattr(settings, "honeypot_auto_reply_threshold", 70.0)
     monkeypatch.setattr("app.routers.honeypot.generate_honeypot_reply", no_gemini)
     monkeypatch.setattr("app.routers.honeypot.enrich_telemetry_hit", no_enrichment)
     app.dependency_overrides[get_session] = override_session
@@ -103,6 +105,7 @@ def test_beacon_captures_request_telemetry_and_redirects(monkeypatch):
                 json={"content": "Pay now to test@upi"},
             )
             assert turn.status_code == 200
+            assert turn.json()["auto_reply"]["allowed"] is True
             reply = turn.json()["messages"][-1]["content"]
             beacon = re.search(r"https://api\.nazar\.test(/api/honeypot/b/[A-Za-z0-9_-]+)", reply)
             assert beacon

@@ -44,7 +44,7 @@ def set_header_auth(node):
 def repair_twilio(workflow):
     workflow = clean(workflow)
     workflow["name"] = "NAZAR - Twilio SMS and WhatsApp Intake"
-    obsolete = {"Extract Proposed Reply (New Session)"}
+    obsolete = {"Extract Proposed Reply (New Session)", "Auto-send permitted?"}
     workflow["nodes"] = [n for n in workflow["nodes"] if n["name"] not in obsolete]
     nodes = {node["name"]: node for node in workflow["nodes"]}
 
@@ -75,6 +75,33 @@ def repair_twilio(workflow):
     reply = nodes["Extract Proposed Reply (Existing Session)"]
     reply["name"] = "Extract Proposed Reply"
     reply["notes"] = "Extracts the latest generated assistant reply after the incoming message was processed."
+    reply["parameters"]["assignments"]["assignments"].append({
+        "id": "r3",
+        "name": "auto_reply_allowed",
+        "type": "boolean",
+        "value": "={{ Boolean($json.auto_reply && $json.auto_reply.allowed) }}",
+    })
+    workflow["nodes"].append({
+        "parameters": {
+            "conditions": {
+                "options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{
+                    "id": "auto-reply-allowed",
+                    "leftValue": "={{ $json.auto_reply_allowed }}",
+                    "rightValue": True,
+                    "operator": {"type": "boolean", "operation": "true"},
+                }],
+                "combinator": "and",
+            },
+            "options": {},
+        },
+        "id": "f793dc74-1d35-47df-9955-09c0c00c7b7e",
+        "name": "Auto-send permitted?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [1456, 288],
+        "notes": "TRUE only when the backend permits automatic delivery for a high-risk session; FALSE keeps human approval.",
+    })
     approval = nodes["Human Approval: Honeypot Reply"]["parameters"]
     approval["sendTo"] = "REPLACE_WITH_APPROVER_EMAIL"
     approval["approvalOptions"] = {"values": {"approvalType": "double"}}
@@ -98,7 +125,8 @@ def repair_twilio(workflow):
         "Start Honeypot Session": output(["Save Sender-Session Mapping"], ["Log Honeypot Error (no secrets)"]),
         "Save Sender-Session Mapping": output(["Send Message to Honeypot Session"]),
         "Send Message to Honeypot Session": output(["Extract Proposed Reply"], ["Log Honeypot Error (no secrets)"]),
-        "Extract Proposed Reply": output(["Human Approval: Honeypot Reply"]),
+        "Extract Proposed Reply": output(["Auto-send permitted?"]),
+        "Auto-send permitted?": output(["Send Approved Honeypot Reply"], ["Human Approval: Honeypot Reply"]),
         "Human Approval: Honeypot Reply": output(["Approved?"]),
         "Approved?": output(["Send Approved Honeypot Reply"], []),
         "Send Approved Honeypot Reply": output([], ["Log Send Error (no secrets)"]),

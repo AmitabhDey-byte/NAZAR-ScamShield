@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     telemetry_geoip_enabled: bool = True
     telemetry_timeout_seconds: float = 3.0
     telemetry_retention_days: int = 30
+    honeypot_auto_reply_enabled: bool = False
+    honeypot_auto_reply_threshold: float = 70.0
+    honeypot_max_auto_replies: int = 6
     ipinfo_token: str | None = None
     ipinfo_tier: str = "lite"
     trust_proxy_headers: bool = True

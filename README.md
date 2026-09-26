@@ -118,6 +118,9 @@ TELEMETRY_RISK_THRESHOLD=30
 TELEMETRY_GEOIP_ENABLED=true
 TELEMETRY_TIMEOUT_SECONDS=3
 TELEMETRY_RETENTION_DAYS=30
+HONEYPOT_AUTO_REPLY_ENABLED=false
+HONEYPOT_AUTO_REPLY_THRESHOLD=70
+HONEYPOT_MAX_AUTO_REPLIES=6
 IPINFO_TOKEN=
 IPINFO_TIER=lite
 TRUST_PROXY_HEADERS=true
@@ -147,6 +150,13 @@ requires it.
 Keep `IPINFO_TIER=lite` for the free country-and-ASN service. Set it to `core`,
 `plus`, or `max` only when the token is subscribed to that tier; those plans
 can return city, region, coordinates, timezone, and additional network flags.
+
+Set `HONEYPOT_AUTO_REPLY_ENABLED=true` to let the Twilio/n8n workflow send
+Gemini honeypot replies automatically only when the original analysis meets
+`HONEYPOT_AUTO_REPLY_THRESHOLD`. The default threshold is 70 and each session
+is limited to six generated automatic replies. Lower-risk sessions and replies
+beyond the cap continue through Gmail human approval. Leave the setting false
+when operating outside a controlled or authorized environment.
 
 URL analysis uses IANA's RDAP bootstrap data and the authoritative registry's
 RDAP service for domain age. For external blacklist checks, configure a Google

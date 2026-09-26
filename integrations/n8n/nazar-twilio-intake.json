@@ -339,6 +339,12 @@
               "name": "session_id",
               "type": "string",
               "value": "={{ $json.session_id || $json.id }}"
+            },
+            {
+              "id": "r3",
+              "name": "auto_reply_allowed",
+              "type": "boolean",
+              "value": "={{ Boolean($json.auto_reply && $json.auto_reply.allowed) }}"
             }
           ]
         },
@@ -353,6 +359,40 @@
         288
       ],
       "notes": "Extracts the latest generated assistant reply after the incoming message was processed."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "auto-reply-allowed",
+              "leftValue": "={{ $json.auto_reply_allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f793dc74-1d35-47df-9955-09c0c00c7b7e",
+      "name": "Auto-send permitted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1456,
+        288
+      ],
+      "notes": "TRUE only when the backend explicitly permits automatic delivery for a high-risk session. FALSE keeps the Gmail human-approval path."
     },
     {
       "parameters": {
@@ -376,7 +416,7 @@
         512
       ],
       "webhookId": "5e2a5856-d687-4652-8e3b-2d0b839ec19f",
-      "notes": "Human-in-the-loop gate. NOTHING is sent to the scammer without explicit approval. Approver receives the scam message, NAZAR classification, and the proposed reply."
+      "notes": "Fallback human-in-the-loop gate for sessions that do not meet the configured backend auto-reply policy."
     },
     {
       "parameters": {
@@ -431,7 +471,7 @@
         512
       ],
       "onError": "continueErrorOutput",
-      "notes": "Sends ONLY the human-approved NAZAR honeypot reply. From = the Twilio number the scammer wrote to; To = the original From. toWhatsapp mirrors the channel, so WhatsApp senders get WhatsApp replies and SMS senders get SMS. Replies stay short, natural, defensive; they never request OTPs/PINs/credentials, never send money or click links, never impersonate law enforcement."
+      "notes": "Sends a backend-authorized automatic reply or a human-approved fallback. From = the Twilio number the sender wrote to; To = the original From. Replies remain bounded by the NAZAR safety policy."
     },
     {
       "parameters": {
@@ -679,6 +719,24 @@
     },
     "Extract Proposed Reply": {
       "main": [
+        [
+          {
+            "node": "Auto-send permitted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-send permitted?": {
+      "main": [
+        [
+          {
+            "node": "Send Approved Honeypot Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Human Approval: Honeypot Reply",

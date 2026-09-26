@@ -66,8 +66,36 @@ Honeypot Session** and set its JSON body to:
 {{ JSON.stringify({ analysis_id: $("Send to NAZAR").item.json.analysis.id, enable_canary: true }) }}
 ```
 
-Keep the Gmail human-approval node enabled. The Canary link appears in the
-proposed reply but is not sent until you approve it.
+Keep the Gmail human-approval node enabled. It remains the delivery path when
+automatic replies are disabled, below threshold, or beyond the reply cap.
+
+## Optional controlled automatic replies
+
+Set these Render variables to enable automatic WhatsApp/SMS honeypot replies:
+
+```dotenv
+HONEYPOT_AUTO_REPLY_ENABLED=true
+HONEYPOT_AUTO_REPLY_THRESHOLD=70
+HONEYPOT_MAX_AUTO_REPLIES=6
+```
+
+The updated workflow reads the backend's `auto_reply.allowed` decision. The
+**Auto-send permitted?** TRUE output goes directly to the Twilio send node; the
+FALSE output goes to the existing Gmail approval node. This ensures n8n cannot
+decide on its own to auto-contact a sender.
+
+For an already-published workflow:
+
+1. Add a Boolean field named `auto_reply_allowed` to **Extract Proposed Reply**
+   with value `{{ Boolean($json.auto_reply && $json.auto_reply.allowed) }}`.
+2. Add an **If** node named **Auto-send permitted?** after that node.
+3. Test whether `{{ $json.auto_reply_allowed }}` is true.
+4. Connect TRUE to **Send Approved Honeypot Reply**.
+5. Connect FALSE to **Human Approval: Honeypot Reply**.
+6. Keep **Approved?** connected to the same Twilio send node, then republish.
+
+Automatic delivery remains restricted to the configured risk threshold and
+reply cap. Use it only with a dedicated defensive number and lawful scope.
 
 If the workflow was already published, also open **Dangerous?**, remove its two
 classification conditions, and add one string condition:
