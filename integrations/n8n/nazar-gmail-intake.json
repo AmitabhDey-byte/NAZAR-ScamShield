@@ -1,0 +1,228 @@
+{
+  "name": "NAZAR - Gmail Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "includeSpamTrash": true,
+          "includeDrafts": false,
+          "readStatus": "unread",
+          "q": "-in:trash -subject:\"NAZAR: approve honeypot reply\""
+        },
+        "options": {},
+        "maxResults": 10
+      },
+      "id": "6578d9b1-f807-4f59-af61-efbd81f0b211",
+      "name": "Gmail Trigger - New Unread",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        96
+      ],
+      "notes": "Polls Gmail every minute for NEW UNREAD emails only. simple=false so the full email body (text/html) is fetched. Each message carries id, threadId, From, Subject, snippet, text, html."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $json.From }}"
+            },
+            {
+              "id": "f2",
+              "name": "subject",
+              "type": "string",
+              "value": "={{ $json.Subject || \"\" }}"
+            },
+            {
+              "id": "f3",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $json.text || \"\" }}"
+            },
+            {
+              "id": "f4",
+              "name": "html",
+              "type": "string",
+              "value": "={{ $json.html || \"\" }}"
+            },
+            {
+              "id": "f5",
+              "name": "snippet",
+              "type": "string",
+              "value": "={{ $json.snippet || \"\" }}"
+            },
+            {
+              "id": "f6",
+              "name": "id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "f7",
+              "name": "threadId",
+              "type": "string",
+              "value": "={{ $json.threadId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c6679e7d-65ed-416d-86e6-7943dfbc9f1d",
+      "name": "Normalize Gmail",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        96
+      ],
+      "notes": "Normalizes the Gmail message into the flat JSON the NAZAR backend expects: from, subject, text, html, snippet, id (Gmail message ID), threadId."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nazar-scamshield.onrender.com/api/integrations/n8n/gmail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $json.from, subject: $json.subject, text: $json.text, html: $json.html, snippet: $json.snippet, id: $json.id, threadId: $json.threadId }) }}",
+        "options": {}
+      },
+      "id": "3b3d68d0-60a9-4af8-a622-ba5433981c54",
+      "name": "Send to NAZAR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        96
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "POSTs the normalized email to the NAZAR backend for scam analysis. The X-NAZAR-Webhook-Secret header is injected from the attached Header Auth credential (encrypted in n8n) — never hardcoded in the workflow. Error branch logs it on failure."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "gmail_message_id",
+              "type": "string",
+              "value": "={{ $(\"Normalize Gmail\").item.json.id }}"
+            },
+            {
+              "id": "e2",
+              "name": "thread_id",
+              "type": "string",
+              "value": "={{ $(\"Normalize Gmail\").item.json.threadId }}"
+            },
+            {
+              "id": "e3",
+              "name": "nazar_response",
+              "type": "string",
+              "value": "={{ JSON.stringify($json).slice(0, 2000) }}"
+            },
+            {
+              "id": "e4",
+              "name": "logged_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "79b81762-b119-4eff-9c45-67d17c2a348c",
+      "name": "Log NAZAR Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        192
+      ],
+      "notes": "Error branch: logs the Gmail message ID, thread ID, and NAZAR response/error body. Never includes the webhook secret or any credential."
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $('Normalize Gmail').item.json.id }}",
+        "labelIds": [
+          "UNREAD"
+        ]
+      },
+      "id": "e22fed01-7d17-409a-810c-51f9690f2811",
+      "name": "Mark Email as Read",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "123c8fe6-a0ec-45c3-b8cd-0c35a79ec13d",
+      "notes": "Removes the UNREAD label after the email was sent to NAZAR, so the unread-filtered trigger never reprocesses the same message."
+    }
+  ],
+  "connections": {
+    "Gmail Trigger - New Unread": {
+      "main": [
+        [
+          {
+            "node": "Normalize Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Gmail": {
+      "main": [
+        [
+          {
+            "node": "Send to NAZAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to NAZAR": {
+      "main": [
+        [
+          {
+            "node": "Mark Email as Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log NAZAR Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email as Read": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

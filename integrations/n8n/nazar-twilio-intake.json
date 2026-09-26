@@ -1,0 +1,740 @@
+{
+  "name": "NAZAR - Twilio SMS and WhatsApp Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nazar-twilio-incoming",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1bf9d230-39d1-440e-bf1c-2e050f63ecc4",
+      "name": "Twilio Incoming Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "4a50d9ee-d236-4ce7-bfc3-9598be71d9ab",
+      "notes": "Receives Twilio SMS/WhatsApp webhooks (application/x-www-form-urlencoded: From, To, Body, MessageSid, ProfileName, NumMedia). Configure this URL as the Twilio Messaging webhook. Responds immediately via the Respond to Webhook node — it never waits for NAZAR/Gemini analysis."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response></Response>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "d7122c9c-538c-4881-9e6f-591d27fdc1fb",
+      "name": "Respond Empty TwiML Immediately",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        272,
+        224
+      ],
+      "notes": "Returns an empty TwiML response to Twilio IMMEDIATELY so Twilio never retries or waits for analysis. All NAZAR processing happens after this node, asynchronously."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $json.body.From }}"
+            },
+            {
+              "id": "t2",
+              "name": "to",
+              "type": "string",
+              "value": "={{ $json.body.To }}"
+            },
+            {
+              "id": "t3",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.body.Body || \"\" }}"
+            },
+            {
+              "id": "t4",
+              "name": "MessageSid",
+              "type": "string",
+              "value": "={{ $json.body.MessageSid }}"
+            },
+            {
+              "id": "t5",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.body.From && $json.body.From.startsWith('whatsapp:') ? 'whatsapp' : 'sms' }}"
+            },
+            {
+              "id": "t6",
+              "name": "ProfileName",
+              "type": "string",
+              "value": "={{ $json.body.ProfileName || \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a64a1130-5caa-4c84-9f70-4b665580770a",
+      "name": "Normalize Twilio",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        496,
+        224
+      ],
+      "notes": "Normalizes the Twilio form payload into flat JSON: from, to, body, MessageSid, channel (whatsapp when From starts with \"whatsapp:\", else sms), ProfileName."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nazar-scamshield.onrender.com/api/integrations/n8n/twilio",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $json.from, to: $json.to, body: $json.body, MessageSid: $json.MessageSid, channel: $json.channel, ProfileName: $json.ProfileName }) }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "5a01bbd0-6ee1-4732-80e7-8ad0b6057931",
+      "name": "Send to NAZAR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        224
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "POSTs the normalized message to NAZAR for scam analysis. Secrets come from env vars only. On failure the error branch logs SID + response without secrets."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "l1",
+              "name": "message_sid",
+              "type": "string",
+              "value": "={{ $(\"Normalize Twilio\").item.json.MessageSid || \"\" }}"
+            },
+            {
+              "id": "l2",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $(\"Normalize Twilio\").item.json.from || \"\" }}"
+            },
+            {
+              "id": "l3",
+              "name": "nazar_response",
+              "type": "string",
+              "value": "={{ JSON.stringify($json).slice(0, 2000) }}"
+            },
+            {
+              "id": "l4",
+              "name": "logged_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cc7d4117-0f06-4dfd-8d72-47b284a272fa",
+      "name": "Log Analysis Error (no secrets)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        944,
+        320
+      ],
+      "notes": "Shared error branch: logs the Twilio MessageSid, sender, and the failing node's response/error. Never logs the webhook secret, Twilio auth token, or any credential value."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "suspicious",
+              "leftValue": "={{ $('Send to NAZAR').item.json.analysis.classification }}",
+              "rightValue": "SUSPICIOUS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "dangerous",
+              "leftValue": "={{ $('Send to NAZAR').item.json.analysis.classification }}",
+              "rightValue": "DANGEROUS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "587323f3-78ed-45e5-b7b1-1646a2cebd50",
+      "name": "Dangerous?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        128
+      ],
+      "notes": "TRUE for SUSPICIOUS or DANGEROUS → honeypot + human approval. FALSE (SAFE) → do nothing, no reply is ever sent automatically."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "RESELECT_TABLE_IN_N8N"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender",
+              "keyValue": "={{ $(\"Normalize Twilio\").item.json.from }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "8097e9fb-c930-4fe8-b308-48f60bd95244",
+      "name": "Lookup Honeypot Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        752,
+        0
+      ],
+      "notes": "Looks up the sender→honeypot session mapping in the nazar_honeypot_sessions Data Table, keyed by the normalized sender (From value).",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-session",
+              "leftValue": "={{ $json.session_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "677a0880-dcd1-4377-9015-2cb0cea9c1b6",
+      "name": "Existing Session?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        192
+      ],
+      "notes": "TRUE → sender already has a honeypot session, continue it. FALSE (no row / empty session_id) → start a new honeypot session."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://nazar-scamshield.onrender.com/api/honeypot/' + $json.session_id + '/message' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $(\"Normalize Twilio\").item.json.body }) }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "2ca556eb-aa9e-4a21-89e0-567d56b43f6e",
+      "name": "Send Message to Honeypot Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        976,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "Continues an existing honeypot session: POSTs the scammer's latest message and gets back the conversation with a new assistant reply."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "l1",
+              "name": "message_sid",
+              "type": "string",
+              "value": "={{ $(\"Normalize Twilio\").item.json.MessageSid || \"\" }}"
+            },
+            {
+              "id": "l2",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $(\"Normalize Twilio\").item.json.from || \"\" }}"
+            },
+            {
+              "id": "l3",
+              "name": "nazar_response",
+              "type": "string",
+              "value": "={{ JSON.stringify($json).slice(0, 2000) }}"
+            },
+            {
+              "id": "l4",
+              "name": "logged_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a3866a00-0e18-464f-a9f6-ccc144fe538f",
+      "name": "Log Honeypot Error (no secrets)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        96
+      ],
+      "notes": "Error branch for honeypot session calls: logs the Twilio MessageSid, sender, and the failing response/error. Never logs the webhook secret, Twilio auth token, or any credential value."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "proposed_reply",
+              "type": "string",
+              "value": "={{ ($json.messages || []).filter(m => m.role === \"assistant\").map(m => m.content).pop() || \"\" }}"
+            },
+            {
+              "id": "r2",
+              "name": "session_id",
+              "type": "string",
+              "value": "={{ $json.session_id || $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "57bb7ac7-6204-49fc-9ede-2062d3ef503d",
+      "name": "Extract Proposed Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        288
+      ],
+      "notes": "Extracts the latest generated assistant reply after the incoming message was processed."
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "REPLACE_WITH_APPROVER_EMAIL",
+        "subject": "={{ \"NAZAR: approve honeypot reply to \" + $(\"Normalize Twilio\").item.json.from }}",
+        "message": "={{ \"Scammer (\" + $(\"Normalize Twilio\").item.json.channel + \"): \" + $(\"Normalize Twilio\").item.json.from + \"\\n\\nTheir message:\\n\" + $(\"Normalize Twilio\").item.json.body + \"\\n\\nClassification: \" + $(\"Send to NAZAR\").item.json.analysis.classification + \" (score \" + $(\"Send to NAZAR\").item.json.analysis.score + \")\\n\\nProposed NAZAR honeypot reply:\\n\" + $json.proposed_reply + \"\\n\\nApprove to send it via Twilio.\" }}",
+        "options": {},
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        }
+      },
+      "id": "8ee646fa-5fa9-447b-9796-6648c5aadf70",
+      "name": "Human Approval: Honeypot Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        512
+      ],
+      "webhookId": "5e2a5856-d687-4652-8e3b-2d0b839ec19f",
+      "notes": "Human-in-the-loop gate. NOTHING is sent to the scammer without explicit approval. Approver receives the scam message, NAZAR classification, and the proposed reply."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "approved",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ea265e20-6b5e-4871-b5b1-dfb6f5d1d796",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1696,
+        512
+      ],
+      "notes": "TRUE → send the approved reply via Twilio. FALSE → discard, nothing is sent."
+    },
+    {
+      "parameters": {
+        "from": "={{ $('Normalize Twilio').item.json.to.replace(/^whatsapp:/, '') }}",
+        "to": "={{ $('Normalize Twilio').item.json.from.replace(/^whatsapp:/, '') }}",
+        "toWhatsapp": "={{ $(\"Normalize Twilio\").item.json.channel === \"whatsapp\" }}",
+        "message": "={{ $('Extract Proposed Reply').item.json.proposed_reply }}",
+        "options": {},
+        "resource": "sms",
+        "operation": "send"
+      },
+      "id": "279c2e60-ec45-49bc-aef9-0a3532893f7e",
+      "name": "Send Approved Honeypot Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        512
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "Sends ONLY the human-approved NAZAR honeypot reply. From = the Twilio number the scammer wrote to; To = the original From. toWhatsapp mirrors the channel, so WhatsApp senders get WhatsApp replies and SMS senders get SMS. Replies stay short, natural, defensive; they never request OTPs/PINs/credentials, never send money or click links, never impersonate law enforcement."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "l1",
+              "name": "message_sid",
+              "type": "string",
+              "value": "={{ $(\"Normalize Twilio\").item.json.MessageSid || \"\" }}"
+            },
+            {
+              "id": "l2",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $(\"Normalize Twilio\").item.json.from || \"\" }}"
+            },
+            {
+              "id": "l3",
+              "name": "twilio_response",
+              "type": "string",
+              "value": "={{ JSON.stringify($json).slice(0, 2000) }}"
+            },
+            {
+              "id": "l4",
+              "name": "logged_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "84ca8adc-182f-43a3-90eb-77687ca9c3f1",
+      "name": "Log Send Error (no secrets)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2144,
+        512
+      ],
+      "notes": "Error branch for the Twilio send: logs the Twilio MessageSid, sender, and the failing response/error. Never logs the webhook secret, Twilio auth token, or any credential value."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nazar-scamshield.onrender.com/api/honeypot/start",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ analysis_id: $(\"Send to NAZAR\").item.json.analysis.id }) }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "96a1bb9e-79d5-44a6-ba7b-abf5e90eda51",
+      "name": "Start Honeypot Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        976,
+        576
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "Starts a new NAZAR honeypot session for this sender using the analysis id from the Send to NAZAR response."
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "RESELECT_TABLE_IN_N8N"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender",
+              "keyValue": "={{ $(\"Normalize Twilio\").item.json.from }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sender": "={{ $(\"Normalize Twilio\").item.json.from }}",
+            "session_id": "={{ $json.session_id || $json.id }}",
+            "channel": "={{ $(\"Normalize Twilio\").item.json.channel }}",
+            "last_analysis_id": "={{ $(\"Send to NAZAR\").item.json.analysis.id }}",
+            "last_message_sid": "={{ $(\"Normalize Twilio\").item.json.MessageSid }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "33ed29e4-cc15-444c-8445-21fccaff10f8",
+      "name": "Save Sender-Session Mapping",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        976,
+        384
+      ],
+      "notes": "Stores the sender→session mapping in the nazar_honeypot_sessions Data Table so later messages from the same sender continue the same honeypot session."
+    }
+  ],
+  "connections": {
+    "Twilio Incoming Message": {
+      "main": [
+        [
+          {
+            "node": "Respond Empty TwiML Immediately",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Empty TwiML Immediately": {
+      "main": [
+        [
+          {
+            "node": "Normalize Twilio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Twilio": {
+      "main": [
+        [
+          {
+            "node": "Send to NAZAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to NAZAR": {
+      "main": [
+        [
+          {
+            "node": "Lookup Honeypot Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Analysis Error (no secrets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Honeypot Session": {
+      "main": [
+        [
+          {
+            "node": "Existing Session?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existing Session?": {
+      "main": [
+        [
+          {
+            "node": "Send Message to Honeypot Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dangerous?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dangerous?": {
+      "main": [
+        [
+          {
+            "node": "Start Honeypot Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Start Honeypot Session": {
+      "main": [
+        [
+          {
+            "node": "Save Sender-Session Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Honeypot Error (no secrets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Sender-Session Mapping": {
+      "main": [
+        [
+          {
+            "node": "Send Message to Honeypot Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Message to Honeypot Session": {
+      "main": [
+        [
+          {
+            "node": "Extract Proposed Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Honeypot Error (no secrets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Proposed Reply": {
+      "main": [
+        [
+          {
+            "node": "Human Approval: Honeypot Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Approval: Honeypot Reply": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Send Approved Honeypot Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Approved Honeypot Reply": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Log Send Error (no secrets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

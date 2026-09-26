@@ -49,6 +49,19 @@ def _extract_gmail_payload(payload: dict) -> GmailWebhookRequest:
     )
 
 
+def _extract_twilio_payload(payload: dict) -> TwilioWebhookRequest:
+    """Accept the flat n8n mapping or Twilio's original form field names."""
+    event = payload.get("body") if isinstance(payload.get("body"), dict) else payload
+    return TwilioWebhookRequest.model_validate({
+        "from": event.get("from") or event.get("From"),
+        "to": event.get("to") or event.get("To"),
+        "body": event.get("body") or event.get("Body") or "",
+        "MessageSid": event.get("MessageSid") or event.get("SmsMessageSid"),
+        "channel": event.get("channel") or "sms",
+        "ProfileName": event.get("ProfileName") or event.get("profile_name"),
+    })
+
+
 @router.post("/n8n/gmail")
 async def ingest_gmail(
     request: Request,
@@ -86,7 +99,7 @@ async def ingest_twilio(
     raw = await request.json()
     if not isinstance(raw, dict):
         raise HTTPException(422, "Expected a Twilio event object")
-    event = TwilioWebhookRequest.model_validate(raw)
+    event = _extract_twilio_payload(raw)
     channel = event.channel.lower()
     source = "twilio_whatsapp" if "whatsapp" in channel or str(event.sender or "").startswith("whatsapp:") else "twilio_sms"
     evidence = "\n".join(filter(None, [

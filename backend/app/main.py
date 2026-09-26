@@ -38,5 +38,8 @@ async def health():
         "gemini": "connected" if settings.gemini_api_key else "not-configured",
         "gemini_model": settings.gemini_model if settings.gemini_api_key else None,
         "realtime": "sse",
-        "integrations": {"n8n_gmail": "configured" if settings.n8n_webhook_secret else "not-configured"},
+        "integrations": {
+            "n8n_gmail": "configured" if settings.n8n_webhook_secret else "not-configured",
+            "n8n_twilio": "configured" if settings.n8n_webhook_secret else "not-configured",
+        },
     }
