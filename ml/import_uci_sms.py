@@ -1,4 +1,4 @@
-"""Download the public UCI SMS Spam Collection and create a provenance-marked CSV."""
+
 from __future__ import annotations
 
 import csv

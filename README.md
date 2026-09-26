@@ -121,7 +121,7 @@ Never prefix the Gemini key with `VITE_`; that would expose it to browser code.
 alembic upgrade head
 ```
 
-The API also calls `create_all()` at startup for hackathon convenience. Keep Alembic as the source of schema change history for team/production workflows.
+The API also calls `create_all()` at startup for hackatho convenience. Keep Alembic as the source of schema change history for team/production workflows.
 
 ## Demo flow
 
