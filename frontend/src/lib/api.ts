@@ -16,6 +16,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   dashboard: () => request<Record<string, any>>('/api/dashboard'),
+  integrationStatus: () => request<Record<string, any>>('/api/integrations/status'),
   analyze: (payload: Record<string, unknown>) => request<Analysis>('/api/analyze/full', { method: 'POST', body: JSON.stringify(payload) }),
   analysis: (id: string) => request<Analysis>(`/api/analyze/${id}`),
   report: (payload: Record<string, unknown>) => request<{ id: string; status: string; message: string }>('/api/reports', { method: 'POST', body: JSON.stringify(payload) }),

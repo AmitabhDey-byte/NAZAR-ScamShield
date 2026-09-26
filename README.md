@@ -203,6 +203,7 @@ pytest -q
 | GET | `/api/devices/{id}/events` | Read that device's synchronized timeline |
 | GET | `/api/devices/{id}/feed` | Read that phone's scans plus Gmail/Twilio live signals |
 | GET | `/api/realtime/events` | Server-sent live analysis, report, device, and honeypot events |
+| GET | `/api/integrations/status` | Last real Gmail, WhatsApp, and SMS deliveries without message contents |
 | POST | `/api/integrations/n8n/gmail` | Ingest a Gmail Trigger event from n8n and analyze it live |
 | POST | `/api/integrations/n8n/twilio` | Ingest an SMS or WhatsApp event from n8n and analyze it live |
 

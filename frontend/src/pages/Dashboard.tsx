@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, ArrowUpRight, Fingerprint, RadioTower, ShieldAlert, Smartphone } from 'lucide-react'
+import { Activity, ArrowUpRight, Fingerprint, Mail, MessageCircle, MessageSquare, RadioTower, ShieldAlert, Smartphone } from 'lucide-react'
 import { Area, AreaChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { Analyzer } from '../components/Analyzer'
 import { PageHeader } from '../components/PageHeader'
@@ -19,7 +19,10 @@ const statMeta = [
 export default function Dashboard() {
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState('')
-  const load = useCallback(() => api.dashboard().then(value => { setData(value); setError('') }).catch(err => setError(err.message)), [])
+  const load = useCallback(() => Promise.all([
+    api.dashboard(),
+    api.integrationStatus().catch(() => null),
+  ]).then(([value, integrations]) => { setData({ ...value, integrations }); setError('') }).catch(err => setError(err.message)), [])
   useEffect(() => { load(); return subscribeRealtime(() => load()) }, [load])
 
   if (!data) return <div className="page"><PageHeader eyebrow="COMMAND CENTER" title="Live scam operations" description="Waiting for your backend…" />{error && <p className="inline-error">{error}</p>}</div>
@@ -27,6 +30,11 @@ export default function Dashboard() {
   return <div className="page dashboard-page">
     <PageHeader eyebrow="COMMAND CENTER" title="Live scam operations" description="Every number below comes from an analysis, paired phone, or community report stored by your backend." action={<span className="sync-label"><i /> Updated {new Date(data.generated_at).toLocaleTimeString()}</span>} />
     <section className="stats-grid">{statMeta.map(([key, label, Icon, context]) => <article className="stat-card" key={key}><div><span>{label}</span><strong>{Number(data.metrics[key] || 0).toLocaleString('en-IN')}</strong></div><div className="stat-side"><Icon size={19} /><b>{context}</b></div></article>)}</section>
+    {data.integrations && <section className="panel intake-status"><div className="intake-heading"><div><span className="panel-kicker">LIVE INTAKE</span><h2>Connected channels</h2></div><span className="sync-label"><i /> n8n {data.integrations.n8n_secret}</span></div><div className="intake-grid">{[
+      ['gmail', 'Gmail', Mail],
+      ['twilio_whatsapp', 'WhatsApp', MessageCircle],
+      ['twilio_sms', 'SMS', MessageSquare],
+    ].map(([key, label, Icon]: any[]) => { const channel = data.integrations.channels[key]; return <div className="intake-channel" key={key}><div className={channel.status === 'receiving' ? 'intake-icon online' : 'intake-icon'}><Icon size={18} /></div><div><strong>{label}</strong><span>{channel.status === 'receiving' ? `${channel.count} received · ${new Date(channel.last_received_at).toLocaleString()}` : 'Awaiting first live event'}</span></div></div> })}</div></section>}
     <section className="dashboard-main"><Analyzer compact /><article className="panel campaign-pulse">
       <div className="panel-heading"><div><span className="panel-kicker">REAL-TIME SIGNALS</span><h2>{campaign ? 'Campaign pulse' : 'Awaiting confirmed reports'}</h2></div>{campaign && <span className="risk-badge suspicious">{campaign.status.toUpperCase()}</span>}</div>
       <div className="sparkline"><ResponsiveContainer width="100%" height={136}><AreaChart data={data.reports_over_time}><defs><linearGradient id="signalArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22D3EE" stopOpacity={0.32} /><stop offset="1" stopColor="#22D3EE" stopOpacity={0} /></linearGradient></defs><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#93A4BA', fontSize: 10 }} /><Tooltip contentStyle={{ background: '#11233A', border: '1px solid rgba(148,163,184,.18)', borderRadius: 10 }} /><Area type="monotone" dataKey="signals" stroke="#22D3EE" fill="url(#signalArea)" strokeWidth={2} /></AreaChart></ResponsiveContainer></div>

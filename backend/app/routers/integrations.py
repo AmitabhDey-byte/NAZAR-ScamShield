@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -37,6 +37,38 @@ async def _existing_delivery(
         .order_by(AnalysisRequest.created_at.desc())
         .limit(1)
     )
+
+
+@router.get("/status")
+async def integration_status(db: AsyncSession = Depends(get_session)):
+    """Report actual persisted deliveries without exposing message contents."""
+    supported = ("gmail", "twilio_whatsapp", "twilio_sms")
+    rows = (await db.execute(
+        select(
+            AnalysisRequest.source_type,
+            func.count(AnalysisRequest.id),
+            func.max(AnalysisRequest.created_at),
+        )
+        .where(AnalysisRequest.source_type.in_(supported))
+        .group_by(AnalysisRequest.source_type)
+    )).all()
+    observed = {
+        source: {"count": int(count), "last_received_at": last_received}
+        for source, count, last_received in rows
+    }
+    channels = {}
+    for source in supported:
+        delivery = observed.get(source, {"count": 0, "last_received_at": None})
+        channels[source] = {
+            **delivery,
+            "status": "receiving" if delivery["count"] else "awaiting-first-event",
+        }
+    return {
+        "n8n_secret": "configured" if settings.n8n_webhook_secret else "not-configured",
+        "gemini": "configured" if settings.gemini_api_key else "not-configured",
+        "channels": channels,
+        "checked_at": datetime.now(timezone.utc),
+    }
 
 
 def _header_value(headers: list[dict], name: str) -> str:

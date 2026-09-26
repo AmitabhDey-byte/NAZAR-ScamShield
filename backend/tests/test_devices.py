@@ -62,6 +62,10 @@ def test_phone_pairing_and_event_sync():
             assert timeline.status_code == 200
             assert timeline.json()[0]["source_label"] == "Clipboard scan"
 
+            integrations = client.get("/api/integrations/status")
+            assert integrations.status_code == 200
+            assert integrations.json()["channels"]["twilio_sms"]["status"] == "awaiting-first-event"
+
             blocked = client.post(
                 f"/api/devices/{device_id}/events",
                 headers=headers,
