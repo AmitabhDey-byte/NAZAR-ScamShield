@@ -7,7 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import FeatureUnion
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 
@@ -43,19 +43,30 @@ def build_pipeline() -> Pipeline:
 class ScamClassifier:
     def __init__(self) -> None:
         self.texts, self.labels, self.sources = load_data()
-        self.pipeline = build_pipeline()
-        folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-        predictions = cross_val_predict(self.pipeline, self.texts, self.labels, cv=folds)
+        train_texts, test_texts, train_labels, test_labels = train_test_split(
+            self.texts,
+            self.labels,
+            test_size=0.20,
+            stratify=self.labels,
+            random_state=42,
+        )
+        evaluation_pipeline = build_pipeline()
+        evaluation_pipeline.fit(train_texts, train_labels)
+        predictions = evaluation_pipeline.predict(test_texts)
         self.metrics = {
             "model_name": "TF-IDF + Logistic Regression",
-            "accuracy": round(float(accuracy_score(self.labels, predictions)), 3),
-            "precision": round(float(precision_score(self.labels, predictions, zero_division=0)), 3),
-            "recall": round(float(recall_score(self.labels, predictions, zero_division=0)), 3),
-            "f1": round(float(f1_score(self.labels, predictions, zero_division=0)), 3),
+            "accuracy": round(float(accuracy_score(test_labels, predictions)), 3),
+            "precision": round(float(precision_score(test_labels, predictions, zero_division=0)), 3),
+            "recall": round(float(recall_score(test_labels, predictions, zero_division=0)), 3),
+            "f1": round(float(f1_score(test_labels, predictions, zero_division=0)), 3),
             "sample_count": len(self.labels),
-            "method": "5-fold stratified cross-validation",
+            "train_sample_count": len(train_labels),
+            "test_sample_count": len(test_labels),
+            "method": "Stratified 80/20 held-out test set",
+            "split_random_state": 42,
             "dataset_sources": self.sources,
         }
+        self.pipeline = build_pipeline()
         self.pipeline.fit(self.texts, self.labels)
 
     def predict(self, text: str) -> dict:

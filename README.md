@@ -2,6 +2,10 @@
 
 NAZAR is a full-stack, explainable digital scam-defense platform built for the CodeVoyage FT-01 ScamShield challenge. It analyzes suspicious messages, URLs, and payment context, explains the risk decision, supports community reporting, runs a strictly defensive synthetic honeypot simulation, and connects reused infrastructure into scam campaigns.
 
+**Live demo:** https://nazar-scam-shield.vercel.app
+
+**API health:** https://nazar-scamshield.onrender.com/api/health
+
 The product follows four layers:
 
 - **SENSE** — extracts amounts, UPI IDs, URLs, phone numbers, claimed organizations, and social-engineering tactics.
@@ -31,7 +35,7 @@ The app defaults to a local SQLite database when `DATABASE_URL` is empty, so the
 - Mobile: Expo SDK 57, React Native, Expo Camera, Expo Clipboard, AsyncStorage
 - Backend: FastAPI, Pydantic, async SQLAlchemy
 - Database: Neon PostgreSQL in production; SQLite fallback for zero-setup demo
-- ML: word + character TF-IDF and Logistic Regression, evaluated on 5 stratified folds
+- ML: word + character TF-IDF and Logistic Regression, evaluated on a separate stratified held-out test set
 - AI: Gemini on the backend for structured risk enrichment and controlled honeypot replies; deterministic fallbacks remain available
 
 ## Project structure
@@ -104,6 +108,10 @@ DATABASE_URL_UNPOOLED=postgresql://user:password@your-endpoint.region.aws.neon.t
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash-lite
 GEMINI_TIMEOUT_SECONDS=12
+URL_INTELLIGENCE_ENABLED=true
+URL_INTELLIGENCE_TIMEOUT_SECONDS=4
+GOOGLE_SAFE_BROWSING_API_KEY=
+URLHAUS_AUTH_KEY=
 N8N_WEBHOOK_SECRET=replace-with-a-long-random-secret
 PUBLIC_API_URL=https://nazar-scamshield.onrender.com
 VITE_API_BASE_URL=http://localhost:8000
@@ -113,6 +121,13 @@ ALLOWED_ORIGIN_REGEX=^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$
 ```
 
 Never prefix the Gemini key with `VITE_`; that would expose it to browser code.
+
+URL analysis uses IANA's RDAP bootstrap data and the authoritative registry's
+RDAP service for domain age. For external blacklist checks, configure a Google
+Safe Browsing API key and/or a URLhaus Auth-Key in Render. Lookups are made only
+to those fixed services; NAZAR never visits the submitted website itself. A
+timeout or unavailable provider is reported as unavailable and does not make a
+URL look safe.
 
 ## Production deployment
 
@@ -174,7 +189,7 @@ Critical multi-channel combinations have a conservative override so an urgent th
 
 ## ML training and evaluation
 
-The classifier loads 5,574 real labeled messages from the UCI SMS Spam Collection plus a small NAZAR-authored India-context supplement. It combines word and character TF-IDF features, evaluates with five stratified folds, and fits the runtime model. Community submissions are not automatically promoted into training data, preventing unreviewed personal data and poisoning attacks. Regenerate the public dataset with `python ml/import_uci_sms.py`.
+The classifier loads 5,574 real labeled messages from the UCI SMS Spam Collection plus a small reviewed India-context supplement. It combines word and character TF-IDF features and reports accuracy, precision, recall, and F1 on a reproducible stratified 20% held-out test split. The runtime classifier is then fitted on the complete reviewed dataset. Community submissions are not automatically promoted into training data, preventing unreviewed personal data and poisoning attacks. Regenerate the public dataset with `python ml/import_uci_sms.py`.
 
 ```bash
 cd backend
@@ -188,7 +203,7 @@ pytest -q
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST | `/api/analyze/message` | Message-only signal and ML analysis |
-| POST | `/api/analyze/url` | Structural URL risk |
+| POST | `/api/analyze/url` | Structural URL, RDAP domain-age, and configured reputation checks |
 | POST | `/api/analyze/transaction` | Transaction anomaly score |
 | POST | `/api/analyze/full` | Combined explainable decision |
 | GET | `/api/analyze/{id}` | Saved analysis |
@@ -215,6 +230,7 @@ pytest -q
 ## Privacy and security
 
 - Gemini is optional and only called by the backend. Untrusted message content is explicitly treated as data, not instructions.
+- When reputation providers are configured, submitted URLs are sent from the backend to Google Safe Browsing and/or URLhaus for a match lookup. Domain-age checks send only the domain to the authoritative RDAP service.
 - The honeypot is a controlled manual relay. Gemini writes a synthetic victim reply, but NAZAR does not automatically message real people, pay, click links, compromise devices, request credentials, or access external systems.
 - UI copy warns users not to submit passwords, OTPs, or private victim data.
 - Mobile authentication-code/OTP content is rejected by the API and is not stored.

@@ -135,7 +135,7 @@ async def ingest_event(
     device = await authenticate(device_id, x_device_token, db)
     if re.search(r"\b(?:otp|one[- ]time password|verification code|authentication code|auth code|cvv|pin)\b", payload.text, re.I) and re.search(r"\b\d{4,8}\b", payload.text):
         raise HTTPException(422, "Authentication-code notifications are not collected")
-    result = await analyze_pipeline(payload.text)
+    result = await analyze_pipeline(payload.text, db=db)
     analysis = AnalysisRequest(
         id=result["id"], source_type="mobile", input_text=payload.text, score=result["score"],
         classification=result["classification"], category=result["category"], reasons=result["reasons"],

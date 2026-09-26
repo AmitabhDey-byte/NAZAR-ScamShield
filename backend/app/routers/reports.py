@@ -18,7 +18,13 @@ async def create_report(payload: ReportCreate, session: AsyncSession = Depends(g
     row = ScamReport(**payload.model_dump())
     session.add(row)
     combined = " ".join(filter(None, [payload.message, payload.phone_number, payload.upi_id, payload.url]))
-    result = await analyze_pipeline(combined, payload.url)
+    result = await analyze_pipeline(combined, payload.url, db=session)
+    if payload.phone_number:
+        result["entities"]["phone_numbers"] = list(dict.fromkeys(result["entities"].get("phone_numbers", []) + [payload.phone_number]))
+    if payload.upi_id:
+        result["entities"]["upi_ids"] = list(dict.fromkeys(result["entities"].get("upi_ids", []) + [payload.upi_id]))
+    if payload.url:
+        result["entities"]["urls"] = list(dict.fromkeys(result["entities"].get("urls", []) + [payload.url]))
     indicators = await record_indicators(session, result["entities"], result["score"], confirmed_report=True)
     campaign = await record_confirmed_campaign(session, payload.scam_category or result["category"], result["entities"], indicators)
     await session.commit()

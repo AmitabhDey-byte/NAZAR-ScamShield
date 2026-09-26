@@ -34,6 +34,34 @@ def entity_candidates(entities: dict) -> list[tuple[str, str]]:
     return list(unique.values())
 
 
+async def community_indicator_risk(db: AsyncSession, entities: dict) -> tuple[float, list[str], list[dict]]:
+    """Score only indicators backed by submitted community reports."""
+    matches: list[ThreatIndicator] = []
+    for kind, value in entity_candidates(entities):
+        row = await db.scalar(
+            select(ThreatIndicator).where(
+                ThreatIndicator.type == kind,
+                ThreatIndicator.value == value,
+                ThreatIndicator.report_count > 0,
+            )
+        )
+        if row:
+            matches.append(row)
+    if not matches:
+        return 0.0, [], []
+
+    report_total = sum(row.report_count for row in matches)
+    strongest = max(row.risk_score for row in matches)
+    score = min(100.0, 48.0 + min(32.0, report_total * 8.0) + strongest * 0.2)
+    labels = ", ".join(f"{row.type.lower()} ({row.report_count} report{'s' if row.report_count != 1 else ''})" for row in matches[:3])
+    reasons = [f"Matches confirmed community intelligence: {labels}"]
+    details = [
+        {"type": row.type, "value": row.value, "report_count": row.report_count, "risk_score": row.risk_score}
+        for row in matches
+    ]
+    return round(score, 1), reasons, details
+
+
 async def record_indicators(
     db: AsyncSession,
     entities: dict,

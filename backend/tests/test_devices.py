@@ -26,7 +26,11 @@ async def override_session():
         yield session
 
 
-def test_phone_pairing_and_event_sync():
+def test_phone_pairing_and_event_sync(monkeypatch):
+    async def no_external_match(_: str):
+        return {"status": "checked", "external_risk_score": 0.0, "reasons": [], "reputation_sources": {}}
+
+    monkeypatch.setattr("app.services.pipeline.inspect_url", no_external_match)
     asyncio.run(prepare_database())
     app.dependency_overrides[get_session] = override_session
     try:
@@ -65,6 +69,15 @@ def test_phone_pairing_and_event_sync():
             integrations = client.get("/api/integrations/status")
             assert integrations.status_code == 200
             assert integrations.json()["channels"]["twilio_sms"]["status"] == "awaiting-first-event"
+
+            report = client.post(
+                "/api/reports",
+                json={"upi_id": "community-test@okaxis", "message": "Scammer requested payment", "scam_category": "payment_request_scam"},
+            )
+            assert report.status_code == 200
+            community = client.post("/api/analyze/message", json={"text": "Please pay community-test@okaxis"})
+            assert community.status_code == 200
+            assert community.json()["component_scores"]["community_risk"] > 0
 
             blocked = client.post(
                 f"/api/devices/{device_id}/events",

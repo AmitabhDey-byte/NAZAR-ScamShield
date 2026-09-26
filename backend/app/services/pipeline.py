@@ -1,17 +1,49 @@
 from __future__ import annotations
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.schemas import TransactionContext
-from app.services.analyzer import classify, clamp, full_analysis
+from app.services.analyzer import classify, clamp, full_analysis, score_components
 from app.services.gemini import assess_with_gemini
+from app.services.intelligence import community_indicator_risk
 from app.services.ml_classifier import get_classifier
+from app.services.url_intelligence import inspect_url
 
 
 async def analyze_pipeline(
     text: str,
     explicit_url: str | None = None,
     transaction: TransactionContext | None = None,
+    db: AsyncSession | None = None,
 ) -> dict:
     result = full_analysis(text, explicit_url, transaction)
+    if db:
+        community_score, community_reasons, community_matches = await community_indicator_risk(db, result["entities"])
+        result["component_scores"]["community_risk"] = community_score
+        if community_matches:
+            result["entities"]["community_matches"] = [
+                f"{item['type']}: {item['value']} ({item['report_count']} report{'s' if item['report_count'] != 1 else ''})"
+                for item in community_matches
+            ]
+        result["reasons"] = list(dict.fromkeys(result["reasons"] + community_reasons))
+
+    url = explicit_url or next(iter(result["entities"].get("urls", [])), None)
+    if url:
+        external = await inspect_url(url)
+        external_score = float(external.get("external_risk_score", 0))
+        result["component_scores"]["external_url_risk"] = external_score
+        result["component_scores"]["url_risk"] = max(result["component_scores"].get("url_risk", 0), external_score)
+        for field in ("domain_age_days", "domain_registered_at", "reputation"):
+            if external.get(field) is not None:
+                result["entities"][field] = external[field]
+        result["entities"]["reputation_sources"] = [
+            f"{name.replace('_', ' ')}: {details['status']}"
+            for name, details in external.get("reputation_sources", {}).items()
+        ]
+        result["reasons"] = list(dict.fromkeys(result["reasons"] + external.get("reasons", [])))
+
+    result["score"] = score_components(result["component_scores"])
+    result["classification"] = classify(result["score"])
     ml = get_classifier().predict(text)
     ml_score = round(ml["scam_probability"] * 100, 1)
     result["component_scores"]["ml_probability"] = ml_score

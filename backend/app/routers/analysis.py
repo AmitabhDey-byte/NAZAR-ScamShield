@@ -1,12 +1,10 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models import AnalysisRequest, Transaction
 from app.schemas import AnalysisResponse, FullAnalyzeRequest, MessageAnalyzeRequest, TransactionContext, UrlAnalyzeRequest
-from app.services.analyzer import message_analysis, transaction_analysis, url_analysis
+from app.services.analyzer import transaction_analysis
 from app.services.intelligence import record_indicators
 from app.services.pipeline import analyze_pipeline
 from app.services.realtime import broker
@@ -33,14 +31,13 @@ async def persist(result: dict, source_type: str, text: str, session: AsyncSessi
 
 
 @router.post("/message")
-async def analyze_message(payload: MessageAnalyzeRequest):
-    return await analyze_pipeline(payload.text)
+async def analyze_message(payload: MessageAnalyzeRequest, session: AsyncSession = Depends(get_session)):
+    return await analyze_pipeline(payload.text, db=session)
 
 
 @router.post("/url")
-async def analyze_url(payload: UrlAnalyzeRequest):
-    score, reasons, entities = url_analysis(payload.url)
-    return {"score": score, "classification": "DANGEROUS" if score >= 70 else "SUSPICIOUS" if score >= 35 else "SAFE", "reasons": reasons, "entities": entities}
+async def analyze_url(payload: UrlAnalyzeRequest, session: AsyncSession = Depends(get_session)):
+    return await analyze_pipeline(payload.url, explicit_url=payload.url, db=session)
 
 
 @router.post("/transaction")
@@ -53,7 +50,7 @@ async def analyze_transaction(payload: TransactionContext, session: AsyncSession
 
 @router.post("/full", response_model=AnalysisResponse)
 async def analyze_full(payload: FullAnalyzeRequest, session: AsyncSession = Depends(get_session)):
-    result = await analyze_pipeline(payload.text, payload.url, payload.transaction)
+    result = await analyze_pipeline(payload.text, payload.url, payload.transaction, session)
     return await persist(result, "full", payload.text, session)
 
 

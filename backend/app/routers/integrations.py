@@ -141,7 +141,7 @@ async def ingest_gmail(
             "status": "duplicate", "source": "gmail", "message_id": email.message_id,
             "thread_id": email.thread_id, "analysis": existing,
         }
-    result = await analyze_pipeline(evidence[:40000])
+    result = await analyze_pipeline(evidence[:40000], db=db)
     persisted = await persist(result, "gmail", evidence[:40000] + marker, db)
     return {"status": "accepted", "source": "gmail", "message_id": email.message_id, "thread_id": email.thread_id, "analysis": persisted}
 
@@ -176,7 +176,7 @@ async def ingest_twilio(
             "sender": event.sender, "recipient": event.recipient, "analysis": existing,
             "reply_mode": "analyst-approved-n8n-send",
         }
-    result = await analyze_pipeline(evidence[:20000])
+    result = await analyze_pipeline(evidence[:20000], db=db)
     persisted = await persist(result, source, evidence[:20000] + marker, db)
     return {
         "status": "accepted", "source": source, "message_sid": event.message_sid,

@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: float = 12.0
+    url_intelligence_enabled: bool = True
+    url_intelligence_timeout_seconds: float = 4.0
+    google_safe_browsing_api_key: str | None = None
+    urlhaus_auth_key: str | None = None
     n8n_webhook_secret: str | None = None
     public_api_url: str | None = None
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

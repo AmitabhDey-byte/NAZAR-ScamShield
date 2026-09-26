@@ -26,22 +26,22 @@ KNOWN_BRANDS = {
 }
 
 CATEGORY_RULES = [
-    ("utility_scam", ["electricity", "connection", "disconnected", "power bill", "bijli"]),
-    ("fake_kyc", ["kyc", "pan update", "account blocked", "verify account"]),
+    ("utility_scam", ["electricity", "connection", "disconnected", "power bill", "bijli", "बिजली", "कनेक्शन काट"]),
+    ("fake_kyc", ["kyc", "pan update", "account blocked", "verify account", "केवाईसी", "khata band", "खाता बंद"]),
     ("bank_impersonation", ["bank", "sbi", "hdfc", "icici", "fraud department"]),
-    ("fake_reward", ["winner", "reward", "cashback", "prize", "lottery"]),
+    ("fake_reward", ["winner", "reward", "cashback", "prize", "lottery", "inaam", "इनाम"]),
     ("investment_scam", ["investment", "guaranteed return", "double your", "trading tip"]),
     ("delivery_scam", ["parcel", "delivery", "courier", "shipping fee"]),
     ("job_scam", ["job offer", "work from home", "registration fee", "hr manager"]),
-    ("phishing", ["login", "verify", "click link", "credentials"]),
+    ("phishing", ["login", "verify", "click link", "credentials", "link kholo", "लिंक खोल"]),
 ]
 
 TACTIC_RULES = {
-    "urgency": ["immediately", "urgent", "today", "now", "within 24", "last chance", "tonight"],
-    "threat": ["blocked", "suspended", "disconnected", "legal action", "penalty", "arrest"],
-    "reward": ["winner", "cashback", "prize", "free gift", "bonus"],
-    "impersonation": ["sbi", "bank", "electricity board", "income tax", "police", "customs"],
-    "secrecy": ["do not tell", "confidential", "keep secret"],
+    "urgency": ["immediately", "urgent", "today", "now", "within 24", "last chance", "tonight", "turant", "abhi", "तुरंत", "अभी", "आज"],
+    "threat": ["blocked", "suspended", "disconnected", "legal action", "penalty", "arrest", "band ho jayega", "बंद", "कानूनी कार्रवाई"],
+    "reward": ["winner", "cashback", "prize", "free gift", "bonus", "inaam", "इनाम", "मुफ्त"],
+    "impersonation": ["sbi", "bank", "electricity board", "income tax", "police", "customs", "बैंक", "पुलिस", "बिजली विभाग"],
+    "secrecy": ["do not tell", "confidential", "keep secret", "kisi ko mat batana", "किसी को मत बताना"],
 }
 
 
@@ -203,13 +203,26 @@ def consistency_analysis(entities: dict, url: str | None, payee: str) -> tuple[f
 
 
 def community_risk(entities: dict) -> tuple[float, list[str]]:
-    risky = {"ramesh123@oksbi", "kycdesk@okaxis", "secure-refund@okhdfcbank"}
-    matches = set(map(str.lower, entities.get("upi_ids", []))) & risky
-    if matches:
-        return 88.0, ["Payment identifier appears in similar community reports"]
-    if entities.get("urls") or entities.get("phone_numbers"):
-        return 28.0, ["Indicators are eligible for community correlation"]
-    return 5.0, []
+    # Real community matches are applied asynchronously from ThreatIndicator
+    # records in the analysis pipeline. No identifiers are hard-coded here.
+    return 0.0, []
+
+
+def score_components(scores: dict[str, float]) -> float:
+    final_score = clamp(
+        0.25 * scores.get("message_risk", 0)
+        + 0.20 * scores.get("url_risk", 0)
+        + 0.20 * scores.get("transaction_risk", 0)
+        + 0.15 * scores.get("community_risk", 0)
+        + 0.20 * scores.get("consistency_risk", 0)
+    )
+    if scores.get("message_risk", 0) >= 75 and max(
+        scores.get("url_risk", 0),
+        scores.get("consistency_risk", 0),
+        scores.get("community_risk", 0),
+    ) >= 60:
+        return max(final_score, 82.0)
+    return final_score
 
 
 def full_analysis(text: str, explicit_url: str | None = None, transaction: TransactionContext | None = None) -> dict:
@@ -233,12 +246,7 @@ def full_analysis(text: str, explicit_url: str | None = None, transaction: Trans
         "community_risk": community_score,
         "consistency_risk": consistency_score,
     }
-    final_score = clamp(
-        0.25 * message_score + 0.20 * url_score + 0.20 * tx_score + 0.15 * community_score + 0.20 * consistency_score
-    )
-    # Critical pressure patterns should not be diluted below a dangerous decision.
-    if message_score >= 75 and max(url_score, consistency_score, community_score) >= 60:
-        final_score = max(final_score, 82)
+    final_score = score_components(scores)
     classification = classify(final_score)
     recommendations = {
         "SAFE": "Confirm the recipient and purpose, then proceed only if you recognize the request.",
