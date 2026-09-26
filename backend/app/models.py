@@ -103,6 +103,7 @@ class HoneypotSession(Base):
     state: Mapped[str] = mapped_column(String(64), default="INITIAL_CONTACT")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     intelligence: Mapped[dict] = mapped_column(JSON, default=dict)
+    beacon_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -112,6 +113,30 @@ class HoneypotMessage(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("honeypot_sessions.id"), index=True)
     role: Mapped[str] = mapped_column(String(24))
     content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class HoneypotTelemetryHit(Base):
+    __tablename__ = "honeypot_telemetry_hits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    session_id: Mapped[str] = mapped_column(ForeignKey("honeypot_sessions.id"), index=True)
+    ip_address: Mapped[str] = mapped_column(String(64))
+    user_agent: Mapped[str] = mapped_column(Text, default="")
+    accept_language: Mapped[str] = mapped_column(String(500), default="")
+    referrer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_type: Mapped[str] = mapped_column(String(64), default="browser")
+    country: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    postal: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    timezone: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    asn: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    organization: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    privacy_flags: Mapped[dict] = mapped_column(JSON, default=dict)
+    geo_status: Mapped[str] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

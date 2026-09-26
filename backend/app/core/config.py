@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     urlhaus_auth_key: str | None = None
     n8n_webhook_secret: str | None = None
     canarytoken_url: str | None = None
+    telemetry_risk_threshold: float = 30.0
+    telemetry_geoip_enabled: bool = True
+    telemetry_timeout_seconds: float = 3.0
+    telemetry_retention_days: int = 30
+    ipinfo_token: str | None = None
+    ipinfo_tier: str = "lite"
+    trust_proxy_headers: bool = True
     public_api_url: str | None = None
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     allowed_origin_regex: str | None = r"^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$"

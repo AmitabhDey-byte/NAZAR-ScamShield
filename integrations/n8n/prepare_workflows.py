@@ -65,8 +65,12 @@ def repair_twilio(workflow):
     for name in ("Lookup Honeypot Session", "Save Sender-Session Mapping"):
         nodes[name]["parameters"]["dataTableId"]["value"] = "RESELECT_TABLE_IN_N8N"
     nodes["Lookup Honeypot Session"]["alwaysOutputData"] = True
-    for condition in nodes["Dangerous?"]["parameters"]["conditions"]["conditions"]:
-        condition["leftValue"] = "={{ $('Send to NAZAR').item.json.analysis.classification }}"
+    nodes["Dangerous?"]["parameters"]["conditions"]["conditions"] = [{
+        "id": "risk-at-least-30",
+        "leftValue": "={{ String(Number($('Send to NAZAR').item.json.analysis.score) >= 30) }}",
+        "rightValue": "true",
+        "operator": {"type": "string", "operation": "equals"},
+    }]
 
     reply = nodes["Extract Proposed Reply (Existing Session)"]
     reply["name"] = "Extract Proposed Reply"

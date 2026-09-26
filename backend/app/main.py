@@ -51,6 +51,8 @@ async def health():
             "n8n_gmail": "configured" if settings.n8n_webhook_secret else "not-configured",
             "n8n_twilio": "configured" if settings.n8n_webhook_secret else "not-configured",
             "canarytoken": "configured" if settings.validated_canarytoken_url else "not-configured",
+            "honeypot_telemetry": "configured" if settings.validated_canarytoken_url and settings.public_api_url else "not-configured",
+            "ipinfo": "configured" if settings.ipinfo_token else "not-configured",
             "rdap_domain_age": "enabled" if settings.url_intelligence_enabled else "disabled",
             "google_safe_browsing": "configured" if settings.google_safe_browsing_api_key else "not-configured",
             "urlhaus": "configured" if settings.urlhaus_auth_key else "not-configured",

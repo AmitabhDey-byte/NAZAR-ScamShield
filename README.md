@@ -114,6 +114,13 @@ GOOGLE_SAFE_BROWSING_API_KEY=
 URLHAUS_AUTH_KEY=
 N8N_WEBHOOK_SECRET=replace-with-a-long-random-secret
 CANARYTOKEN_URL=
+TELEMETRY_RISK_THRESHOLD=30
+TELEMETRY_GEOIP_ENABLED=true
+TELEMETRY_TIMEOUT_SECONDS=3
+TELEMETRY_RETENTION_DAYS=30
+IPINFO_TOKEN=
+IPINFO_TIER=lite
+TRUST_PROXY_HEADERS=true
 PUBLIC_API_URL=https://nazar-scamshield.onrender.com
 VITE_API_BASE_URL=http://localhost:8000
 EXPO_PUBLIC_API_BASE_URL=https://nazar-scamshield.onrender.com
@@ -127,6 +134,20 @@ to an explicitly armed, human-approved reply and never requests the URL itself.
 Use a fresh token for each controlled demo so unrelated requests cannot create
 misleading alerts.
 
+For honeypot telemetry, add an IPinfo access token as `IPINFO_TOKEN` in Render.
+NAZAR records the beacon request's public IP, user agent, accepted language,
+referrer, timestamp, and approximate IP intelligence. Available location and
+network fields depend on the IPinfo plan. This is not precise GPS and can point
+to a VPN, mobile carrier gateway, or messaging-app preview service. The beacon
+is eligible only for analyses at or above `TELEMETRY_RISK_THRESHOLD` and still
+requires the existing human approval before Twilio sends it.
+Old telemetry is removed during beacon processing after 30 days by default;
+adjust `TELEMETRY_RETENTION_DAYS` only if your legitimate retention policy
+requires it.
+Keep `IPINFO_TIER=lite` for the free country-and-ASN service. Set it to `core`,
+`plus`, or `max` only when the token is subscribed to that tier; those plans
+can return city, region, coordinates, timezone, and additional network flags.
+
 URL analysis uses IANA's RDAP bootstrap data and the authoritative registry's
 RDAP service for domain age. For external blacklist checks, configure a Google
 Safe Browsing API key and/or a URLhaus Auth-Key in Render. Lookups are made only
@@ -139,6 +160,16 @@ URL look safe.
 The backend is configured for `https://nazar-scamshield.onrender.com`. On the
 Render service, set `PUBLIC_API_URL` to that exact URL so phone pairing never
 receives Render's private container address.
+
+Because honeypot telemetry adds database columns, set the Render backend's
+**Start Command** to run migrations before the server:
+
+```bash
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Keep the Render **Root Directory** as `backend`. The migration is safe whether
+the telemetry table was created previously or not.
 
 For Vercel, import the repository, set **Root Directory** to `frontend`, and
 set `VITE_API_BASE_URL=https://nazar-scamshield.onrender.com`. The committed

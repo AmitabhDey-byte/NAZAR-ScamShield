@@ -173,18 +173,9 @@
           },
           "conditions": [
             {
-              "id": "suspicious",
-              "leftValue": "={{ $('Send to NAZAR').item.json.analysis.classification }}",
-              "rightValue": "SUSPICIOUS",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            },
-            {
-              "id": "dangerous",
-              "leftValue": "={{ $('Send to NAZAR').item.json.analysis.classification }}",
-              "rightValue": "DANGEROUS",
+              "id": "risk-at-least-30",
+              "leftValue": "={{ String(Number($('Send to NAZAR').item.json.analysis.score) >= 30) }}",
+              "rightValue": "true",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -203,7 +194,7 @@
         944,
         128
       ],
-      "notes": "TRUE for SUSPICIOUS or DANGEROUS → honeypot + human approval. FALSE (SAFE) → do nothing, no reply is ever sent automatically."
+      "notes": "TRUE when NAZAR risk score is 30 or higher → telemetry-enabled honeypot + human approval. FALSE → do nothing, no reply is ever sent automatically."
     },
     {
       "parameters": {

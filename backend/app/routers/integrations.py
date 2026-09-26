@@ -67,6 +67,8 @@ async def integration_status(db: AsyncSession = Depends(get_session)):
         "n8n_secret": "configured" if settings.n8n_webhook_secret else "not-configured",
         "gemini": "configured" if settings.gemini_api_key else "not-configured",
         "canarytoken": "configured" if settings.validated_canarytoken_url else "not-configured",
+        "honeypot_telemetry": "configured" if settings.validated_canarytoken_url and settings.public_api_url else "not-configured",
+        "ipinfo": "configured" if settings.ipinfo_token else "not-configured",
         "channels": channels,
         "checked_at": datetime.now(timezone.utc),
     }
